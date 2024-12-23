@@ -171,6 +171,29 @@ const App = () => {
         y: event.clientY,
       };
       setMovingShape(draggingShape);
+
+      // TODO: Fix this
+      const selectionGroup = getSelectionGroup();
+      const otherShapesToMove = selectionGroup
+        ? Object.values(selectionGroup.shapes)
+        : [];
+
+      if (otherShapesToMove.length > 1) {
+        for (const shape of otherShapesToMove) {
+          if (shape.id === draggingShape.id) {
+            // Already moved
+            continue;
+          }
+
+          shape.dragStart = {
+            x: event.clientX,
+            y: event.clientY,
+          };
+        }
+
+        setShapes(otherShapesToMove);
+      }
+      /////////
     }
   };
 
@@ -219,6 +242,37 @@ const App = () => {
       movingShape.y += yDiff;
       movingShape.dragStart.x = event.clientX;
       movingShape.dragStart.y = event.clientY;
+
+      // TODO: Fix this
+      const selectionGroup = getSelectionGroup();
+      const otherShapesToMove = selectionGroup
+        ? Object.values(selectionGroup.shapes)
+        : [];
+
+      if (otherShapesToMove.length > 1) {
+        for (const shape of otherShapesToMove) {
+          if (shape.id === movingShape.id) {
+            // Already moved
+            continue;
+          }
+
+          const dragStart = {
+            x: shape.dragStart?.x ?? 0,
+            y: shape.dragStart?.y ?? 0,
+          };
+          const xDiffAnother = event.clientX - dragStart.x;
+          const yDiffAnother = event.clientY - dragStart.y;
+          shape.x += xDiffAnother;
+          shape.y += yDiffAnother;
+          shape.dragStart = {
+            x: event.clientX,
+            y: event.clientY,
+          };
+        }
+
+        setShapes(otherShapesToMove);
+      }
+      ///////////
 
       setMovingShape(movingShape);
     }

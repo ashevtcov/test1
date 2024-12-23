@@ -2,6 +2,8 @@ import { newId } from '../tools/object';
 
 export type StateManager<T> = [getter: () => T, setter: (value: T) => void];
 
+// I would not use this in production due to JSON conversions (will be slow on scale!)
+// Some object-based state management would work better
 export const useLocalStorageState = () =>
   function <T>(initWithDefault?: T | null): StateManager<T> {
     const key = newId();
