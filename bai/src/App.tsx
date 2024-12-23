@@ -1,10 +1,8 @@
-import React, { KeyboardEvent, MouseEvent, useEffect, useRef } from 'react';
+import React, { MouseEvent, useEffect, useRef } from 'react';
 import { useLocalStorageState } from './hooks/useLocalStorageState';
 import { newId } from './tools/object';
 import { Rect, Selection, SelectionGroup, Shape } from './types/shapes';
 import { normalizeSelection } from './tools/shapes';
-
-const KEY_DELETE = 39;
 
 const App = () => {
   const useGlobalState = useLocalStorageState();
@@ -79,24 +77,28 @@ const App = () => {
 
     context.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
+    // Selection
     const selection = getSelection();
 
     if (selection) {
       renderSelection(selection);
     }
 
+    // Resizable shape
     const resizingShape = getResizingShape();
 
     if (resizingShape) {
       renderResizingShape(resizingShape);
     }
 
+    // Single dragging shape
     const movingShape = getMovingShape();
 
     if (movingShape) {
       renderMovingShape(movingShape);
     }
 
+    // All shapes, that neither resizing nor dragging
     for (const shape of getShapes()) {
       if (shape.id !== movingShape?.id && shape.id !== resizingShape?.id) {
         renderShape(shape);
@@ -131,10 +133,11 @@ const App = () => {
   const onMouseDown = (event: MouseEvent<HTMLCanvasElement>) => {
     event.preventDefault();
 
-    const shape = findShape(event.clientX, event.clientY);
+    const draggingShape = findShape(event.clientX, event.clientY);
     const resizingShape = findResizingShape(event.clientX, event.clientY);
 
-    if (!shape && !resizingShape) {
+    // If a shape or a shape's drag box not triggered - creating visual selection helper
+    if (!draggingShape && !resizingShape) {
       const selection: Selection = {
         x: event.clientX,
         y: event.clientY,
@@ -150,6 +153,7 @@ const App = () => {
       return;
     }
 
+    // A shape is being resized as mouse pointer triggered its resize box
     if (resizingShape) {
       resizingShape.resizeStart = {
         x: event.clientX,
@@ -160,12 +164,13 @@ const App = () => {
       return;
     }
 
-    if (shape) {
-      shape.dragStart = {
+    // A shape is being moved as mouse pointer is within its bounds but not the resize box
+    if (draggingShape) {
+      draggingShape.dragStart = {
         x: event.clientX,
         y: event.clientY,
       };
-      setMovingShape(shape);
+      setMovingShape(draggingShape);
     }
   };
 
@@ -173,6 +178,7 @@ const App = () => {
     event.preventDefault();
     const selection = getSelection();
 
+    // Updating bounds of a visual selection helper
     if (selection?.resizeStart) {
       const xDiff = event.clientX - (selection.resizeStart.x ?? 0);
       const yDiff = event.clientY - (selection.resizeStart.y ?? 0);
@@ -187,6 +193,7 @@ const App = () => {
 
     const resizingShape = getResizingShape();
 
+    // Updating bounds of a shape that's being resized
     if (resizingShape?.resizeStart) {
       const xDiff = event.clientX - (resizingShape.resizeStart.x ?? 0);
       const yDiff = event.clientY - (resizingShape.resizeStart.y ?? 0);
@@ -203,6 +210,7 @@ const App = () => {
 
     const movingShape = getMovingShape();
 
+    // Updating bounds of a shape that's being moved
     if (movingShape?.dragStart) {
       const xDiff = event.clientX - (movingShape.dragStart.x ?? 0);
       const yDiff = event.clientY - (movingShape.dragStart.y ?? 0);
@@ -221,10 +229,10 @@ const App = () => {
 
     const selection = getSelection();
 
+    // Finalizing selection - if any shapes found within its bounds - creating a selection group
     if (selection) {
       const allShapes = getShapes();
       const normalizedSelection = normalizeSelection(selection);
-      console.log(normalizedSelection);
       const group: SelectionGroup = {
         selection: normalizedSelection,
         shapes: {},
@@ -236,12 +244,13 @@ const App = () => {
         }
       }
 
-      setSelectionGroup(group);
+      setSelectionGroup(Object.values(group.shapes).length ? group : null);
       setSelection(null);
     }
 
     const resizingShape = getResizingShape();
 
+    // Finalizing resize by updating bounds of a shape that's being resized
     if (resizingShape) {
       const allShapes = getShapes();
 
@@ -260,6 +269,7 @@ const App = () => {
 
     const movingShape = getMovingShape();
 
+    // Finalizing drag'n'drop by updating coordinates of a shape that's being moved
     if (movingShape) {
       const allShapes = getShapes();
 
@@ -274,6 +284,7 @@ const App = () => {
       setMovingShape(null);
     }
 
+    // Bonus - if we want to select a shape (let's say for deleting) by clicking on it
     if (!selection) {
       const selectedShape = findShape(event.clientX, event.clientY);
 
@@ -300,9 +311,6 @@ const App = () => {
     const canvas = canvasRef.current;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    // canvas.onmousedown = onMouseDown;
-    // canvas.onmouseup = onMouseUp;
-    // canvas.onmousemove = onMouseMove;
 
     const context = canvas.getContext('2d');
 
