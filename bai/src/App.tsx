@@ -94,6 +94,13 @@ const App = () => {
 
     context.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
+    const selection = getSelection();
+
+    if (selection) {
+      console.log('sel');
+      renderSelection(selection);
+    }
+
     const resizingShape = getResizingShape();
 
     if (resizingShape) {
@@ -138,6 +145,7 @@ const App = () => {
     const resizingShape = findResizingShape(event.clientX, event.clientY);
 
     if (!shape && !resizingShape) {
+      console.log('creating selection');
       const selection: Selection = {
         x: event.clientX,
         y: event.clientY,
@@ -150,6 +158,7 @@ const App = () => {
       };
 
       setSelection(selection);
+      return;
     }
 
     if (resizingShape) {
@@ -178,6 +187,8 @@ const App = () => {
 
     if (selection) {
       // TODO: Find shapes within selection bounds
+
+      console.log('removing selection');
       setSelection(null);
     }
 
@@ -218,8 +229,16 @@ const App = () => {
     event.preventDefault();
     const selection = getSelection();
 
-    if (selection) {
-      setSelection(null);
+    if (selection?.resizeStart) {
+      const xDiff = event.clientX - (selection.resizeStart.x ?? 0);
+      const yDiff = event.clientY - (selection.resizeStart.y ?? 0);
+
+      selection.width += xDiff;
+      selection.height += yDiff;
+      selection.resizeStart.x = event.clientX;
+      selection.resizeStart.y = event.clientY;
+
+      setSelection(selection);
     }
 
     const resizingShape = getResizingShape();
