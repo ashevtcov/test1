@@ -33,10 +33,17 @@ type Shape = Rect &
 
 type Selection = Rect & Resizable;
 
+interface SelectionGroup {
+  selection: Selection;
+  shapes: Record<string, Shape>;
+}
+
 const App = () => {
   const useGlobalState = useLocalStorageState();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [getSelection, setSelection] = useGlobalState<Selection | null>(null);
+  const [getSelectionGroup, setSelectionGroup] =
+    useGlobalState<SelectionGroup | null>(null);
   const [getMovingShape, setMovingShape] = useGlobalState<Shape | null>(null);
   const [getResizingShape, setResizingShape] = useGlobalState<Shape | null>(
     null
@@ -65,21 +72,24 @@ const App = () => {
     context: CanvasRenderingContext2D
   ) => {
     const renderShape = (shape: Shape) => {
-      const { x, y, width, height, color } = shape;
+      const { id, x, y, width, height, color } = shape;
+      const selectionGroup = getSelectionGroup();
+
       context.fillStyle = color;
       context.fillRect(x, y, width, height);
       context.fillStyle = 'black';
       context.fillRect(x + width - 10, y + height - 10, 10, 10);
-    };
 
-    const renderSelection = (selection: Selection) => {
-      const { x, y, width, height } = selection;
-      context.strokeStyle = 'grey';
-      context.strokeRect(x, y, width, height);
+      if (selectionGroup?.shapes[id]) {
+        context.lineWidth = 2;
+        context.strokeStyle = 'black';
+        context.strokeRect(x, y, width, height);
+      }
     };
 
     const renderMovingShape = (shape: Shape) => {
       const { x, y, width, height, color } = shape;
+
       context.strokeStyle = color;
       context.strokeRect(x, y, width, height);
     };
@@ -90,6 +100,13 @@ const App = () => {
       context.strokeRect(x, y, width, height);
       context.fillStyle = 'black';
       context.fillRect(x + width - 10, y + height - 10, 10, 10);
+    };
+
+    const renderSelection = (selection: Selection) => {
+      const { x, y, width, height } = selection;
+
+      context.strokeStyle = 'grey';
+      context.strokeRect(x, y, width, height);
     };
 
     context.clearRect(0, 0, window.innerWidth, window.innerHeight);
@@ -138,6 +155,12 @@ const App = () => {
         y <= shape.y + shape.height
     );
 
+  const isShapeWithinBounds = (shape: Rect, selection: Rect) =>
+    shape.x >= selection.x &&
+    shape.x + shape.width <= selection.x + selection.width &&
+    shape.y >= selection.y &&
+    shape.y + shape.height <= selection.y + selection.height;
+
   const onMouseDown = (event: MouseEvent<HTMLCanvasElement>) => {
     event.preventDefault();
 
@@ -177,51 +200,6 @@ const App = () => {
         y: event.clientY,
       };
       setMovingShape(shape);
-    }
-  };
-
-  const onMouseUp = (event: MouseEvent<HTMLCanvasElement>) => {
-    event.preventDefault();
-
-    const selection = getSelection();
-
-    if (selection) {
-      // TODO: Find shapes within selection bounds
-
-      console.log('removing selection');
-      setSelection(null);
-    }
-
-    const resizingShape = getResizingShape();
-
-    if (resizingShape) {
-      const allShapes = getShapes();
-
-      for (const shape of allShapes) {
-        if (shape.id === resizingShape.id) {
-          shape.width = resizingShape.width;
-          shape.height = resizingShape.height;
-        }
-      }
-
-      setShapes(allShapes);
-      setResizingShape(null);
-    }
-
-    const movingShape = getMovingShape();
-
-    if (movingShape) {
-      const allShapes = getShapes();
-
-      for (const shape of allShapes) {
-        if (shape.id === movingShape.id) {
-          shape.x = movingShape.x;
-          shape.y = movingShape.y;
-        }
-      }
-
-      setShapes(allShapes);
-      setMovingShape(null);
     }
   };
 
@@ -269,6 +247,62 @@ const App = () => {
       movingShape.dragStart.y = event.clientY;
 
       setMovingShape(movingShape);
+    }
+  };
+
+  const onMouseUp = (event: MouseEvent<HTMLCanvasElement>) => {
+    event.preventDefault();
+
+    const selection = getSelection();
+
+    if (selection) {
+      const allShapes = getShapes();
+      const group: SelectionGroup = {
+        selection,
+        shapes: {},
+      };
+
+      for (const shape of allShapes) {
+        if (isShapeWithinBounds(shape, selection)) {
+          group.shapes[shape.id] = shape;
+        }
+      }
+
+      console.log('removing selection');
+      setSelectionGroup(group);
+      setSelection(null);
+    }
+
+    const resizingShape = getResizingShape();
+
+    if (resizingShape) {
+      const allShapes = getShapes();
+
+      for (const shape of allShapes) {
+        if (shape.id === resizingShape.id) {
+          shape.width = resizingShape.width;
+          shape.height = resizingShape.height;
+        }
+      }
+
+      setShapes(allShapes);
+      setResizingShape(null);
+    }
+
+    const movingShape = getMovingShape();
+
+    if (movingShape) {
+      const allShapes = getShapes();
+
+      for (const shape of allShapes) {
+        if (shape.id === movingShape.id) {
+          shape.x = movingShape.x;
+          shape.y = movingShape.y;
+        }
+      }
+
+      setShapes(allShapes);
+      setMovingShape(null);
     }
   };
 
