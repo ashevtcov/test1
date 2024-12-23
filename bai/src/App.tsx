@@ -1,42 +1,10 @@
-import React, { MouseEvent, useEffect, useRef } from 'react';
+import React, { KeyboardEvent, MouseEvent, useEffect, useRef } from 'react';
 import { useLocalStorageState } from './hooks/useLocalStorageState';
 import { newId } from './tools/object';
+import { Rect, Selection, SelectionGroup, Shape } from './types/shapes';
+import { normalizeSelection } from './tools/shapes';
 
-const Dimensions = {
-  margin: 0,
-};
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-type Rect = Point & {
-  width: number;
-  height: number;
-};
-
-interface Draggable {
-  dragStart?: Point;
-}
-
-interface Resizable {
-  resizeStart?: Point;
-}
-
-type Shape = Rect &
-  Draggable &
-  Resizable & {
-    id: string;
-    color: string;
-  };
-
-type Selection = Rect & Resizable;
-
-interface SelectionGroup {
-  selection: Selection;
-  shapes: Record<string, Shape>;
-}
+const KEY_DELETE = 39;
 
 const App = () => {
   const useGlobalState = useLocalStorageState();
@@ -114,7 +82,6 @@ const App = () => {
     const selection = getSelection();
 
     if (selection) {
-      console.log('sel');
       renderSelection(selection);
     }
 
@@ -168,7 +135,6 @@ const App = () => {
     const resizingShape = findResizingShape(event.clientX, event.clientY);
 
     if (!shape && !resizingShape) {
-      console.log('creating selection');
       const selection: Selection = {
         x: event.clientX,
         y: event.clientY,
@@ -257,18 +223,19 @@ const App = () => {
 
     if (selection) {
       const allShapes = getShapes();
+      const normalizedSelection = normalizeSelection(selection);
+      console.log(normalizedSelection);
       const group: SelectionGroup = {
-        selection,
+        selection: normalizedSelection,
         shapes: {},
       };
 
       for (const shape of allShapes) {
-        if (isShapeWithinBounds(shape, selection)) {
+        if (isShapeWithinBounds(shape, normalizedSelection)) {
           group.shapes[shape.id] = shape;
         }
       }
 
-      console.log('removing selection');
       setSelectionGroup(group);
       setSelection(null);
     }
@@ -287,6 +254,8 @@ const App = () => {
 
       setShapes(allShapes);
       setResizingShape(null);
+
+      return;
     }
 
     const movingShape = getMovingShape();
@@ -303,6 +272,23 @@ const App = () => {
 
       setShapes(allShapes);
       setMovingShape(null);
+    }
+
+    if (!selection) {
+      const selectedShape = findShape(event.clientX, event.clientY);
+
+      if (selectedShape) {
+        const group: SelectionGroup = {
+          selection: {
+            ...selectedShape,
+          },
+          shapes: {
+            [selectedShape.id]: selectedShape,
+          },
+        };
+
+        setSelectionGroup(group);
+      }
     }
   };
 
@@ -336,7 +322,6 @@ const App = () => {
         onMouseUp={onMouseUp}
         onMouseMove={onMouseMove}
         style={{
-          margin: Dimensions.margin,
           width: window.innerWidth,
           height: window.innerHeight,
           border: '2px solid grey',
