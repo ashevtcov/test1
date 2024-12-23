@@ -77,6 +77,9 @@ const App = () => {
     }
   };
 
+  const getShapeById = (id: string) =>
+    getShapes().find((shape) => shape.id === id);
+
   const findShape = (x: number, y: number) =>
     getShapes().find(
       (shape) =>
@@ -126,6 +129,16 @@ const App = () => {
     const movingShape = getMovingShape();
 
     if (movingShape) {
+      const allShapes = getShapes();
+
+      for (const shape of allShapes) {
+        if (shape.id === movingShape.id) {
+          shape.x = movingShape.x;
+          shape.y = movingShape.y;
+        }
+      }
+
+      setShapes(allShapes);
       setMovingShape(null);
     }
   };
@@ -138,9 +151,9 @@ const App = () => {
     if (movingShape) {
       const xDiff = event.clientX - (movingShape.dragStartX ?? 0);
       const yDiff = event.clientY - (movingShape.dragStartY ?? 0);
+
       movingShape.x += xDiff;
       movingShape.y += yDiff;
-
       movingShape.dragStartX = event.clientX;
       movingShape.dragStartY = event.clientY;
 
