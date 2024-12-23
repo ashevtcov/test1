@@ -31,9 +31,12 @@ type Shape = Rect &
     color: string;
   };
 
+type Selection = Rect & Resizable;
+
 const App = () => {
   const useGlobalState = useLocalStorageState();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [getSelection, setSelection] = useGlobalState<Selection | null>(null);
   const [getMovingShape, setMovingShape] = useGlobalState<Shape | null>(null);
   const [getResizingShape, setResizingShape] = useGlobalState<Shape | null>(
     null
@@ -69,6 +72,12 @@ const App = () => {
       context.fillRect(x + width - 10, y + height - 10, 10, 10);
     };
 
+    const renderSelection = (selection: Selection) => {
+      const { x, y, width, height } = selection;
+      context.strokeStyle = 'grey';
+      context.strokeRect(x, y, width, height);
+    };
+
     const renderMovingShape = (shape: Shape) => {
       const { x, y, width, height, color } = shape;
       context.strokeStyle = color;
@@ -93,14 +102,14 @@ const App = () => {
 
     const movingShape = getMovingShape();
 
+    if (movingShape) {
+      renderMovingShape(movingShape);
+    }
+
     for (const shape of getShapes()) {
       if (shape.id !== movingShape?.id && shape.id !== resizingShape?.id) {
         renderShape(shape);
       }
-    }
-
-    if (movingShape) {
-      renderMovingShape(movingShape);
     }
   };
 
@@ -125,7 +134,23 @@ const App = () => {
   const onMouseDown = (event: MouseEvent<HTMLCanvasElement>) => {
     event.preventDefault();
 
+    const shape = findShape(event.clientX, event.clientY);
     const resizingShape = findResizingShape(event.clientX, event.clientY);
+
+    if (!shape && !resizingShape) {
+      const selection: Selection = {
+        x: event.clientX,
+        y: event.clientY,
+        width: 0,
+        height: 0,
+        resizeStart: {
+          x: event.clientX,
+          y: event.clientY,
+        },
+      };
+
+      setSelection(selection);
+    }
 
     if (resizingShape) {
       resizingShape.resizeStart = {
@@ -136,8 +161,6 @@ const App = () => {
       setResizingShape(resizingShape);
       return;
     }
-
-    const shape = findShape(event.clientX, event.clientY);
 
     if (shape) {
       shape.dragStart = {
@@ -151,9 +174,26 @@ const App = () => {
   const onMouseUp = (event: MouseEvent<HTMLCanvasElement>) => {
     event.preventDefault();
 
+    const selection = getSelection();
+
+    if (selection) {
+      // TODO: Find shapes within selection bounds
+      setSelection(null);
+    }
+
     const resizingShape = getResizingShape();
 
     if (resizingShape) {
+      const allShapes = getShapes();
+
+      for (const shape of allShapes) {
+        if (shape.id === resizingShape.id) {
+          shape.width = resizingShape.width;
+          shape.height = resizingShape.height;
+        }
+      }
+
+      setShapes(allShapes);
       setResizingShape(null);
     }
 
@@ -176,6 +216,11 @@ const App = () => {
 
   const onMouseMove = (event: MouseEvent<HTMLCanvasElement>) => {
     event.preventDefault();
+    const selection = getSelection();
+
+    if (selection) {
+      setSelection(null);
+    }
 
     const resizingShape = getResizingShape();
 
@@ -187,6 +232,8 @@ const App = () => {
       resizingShape.height += yDiff;
       resizingShape.resizeStart.x = event.clientX;
       resizingShape.resizeStart.y = event.clientY;
+
+      setResizingShape(resizingShape);
 
       return;
     }
