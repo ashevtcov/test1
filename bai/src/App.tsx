@@ -10,16 +10,20 @@ interface Shape {
   id: string;
   x: number;
   y: number;
+  dragStartX?: number;
+  dragStartY?: number;
   width: number;
   height: number;
   color: string;
-  isMoving?: boolean;
 }
 
 const App = () => {
   const useGlobalState = useLocalStorageState();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [getMovingShape, setMovingShape] = useGlobalState<Shape | null>(null);
+  const [getResizingShape, setResizingShape] = useGlobalState<Shape | null>(
+    null
+  );
   const [getShapes, setShapes] = useGlobalState<Shape[]>([
     {
       id: newId(),
@@ -48,7 +52,7 @@ const App = () => {
       context.fillStyle = color;
       context.fillRect(x, y, width, height);
       context.fillStyle = 'black';
-      context.fillRect(width - 10, height - 10, 10, 10);
+      context.fillRect(x + width - 10, y + height - 10, 10, 10);
     };
 
     const renderMovingShape = (shape: Shape) => {
@@ -59,10 +63,11 @@ const App = () => {
 
     context.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
+    const resizingShape = getResizingShape();
     const movingShape = getMovingShape();
 
     for (const shape of getShapes()) {
-      if (shape.id !== movingShape?.id) {
+      if (shape.id !== movingShape?.id && shape.id !== resizingShape?.id) {
         renderShape(shape);
       }
     }
@@ -81,27 +86,48 @@ const App = () => {
         y <= shape.y + shape.height
     );
 
+  const findResizingShape = (x: number, y: number) =>
+    getShapes().find(
+      (shape) =>
+        x >= shape.x + shape.width - 10 &&
+        x <= shape.x + shape.width &&
+        y >= shape.y + shape.height - 10 &&
+        y <= shape.y + shape.height
+    );
+
   const onMouseDown = (event: MouseEvent<HTMLCanvasElement>) => {
     event.preventDefault();
-    console.log(event.clientX, event.clientY);
+
+    const resizingShape = findResizingShape(event.clientX, event.clientY);
+
+    if (resizingShape) {
+      setResizingShape(resizingShape);
+      return;
+    }
 
     const shape = findShape(event.clientX, event.clientY);
 
     if (shape) {
-      shape.x = event.clientX;
-      shape.isMoving = true;
+      shape.dragStartX = event.clientX;
+      shape.dragStartY = event.clientY;
       setMovingShape(shape);
     }
   };
 
   const onMouseUp = (event: MouseEvent<HTMLCanvasElement>) => {
+    event.preventDefault();
+
+    const resizingShape = getResizingShape();
+
+    if (resizingShape) {
+      setResizingShape(null);
+    }
+
     const movingShape = getMovingShape();
 
     if (movingShape) {
       setMovingShape(null);
     }
-
-    event.preventDefault();
   };
 
   const onMouseMove = (event: MouseEvent<HTMLCanvasElement>) => {
@@ -110,9 +136,14 @@ const App = () => {
     const movingShape = getMovingShape();
 
     if (movingShape) {
-      console.log('moving!');
-      movingShape.x = event.clientX;
-      movingShape.y = event.clientY;
+      const xDiff = event.clientX - (movingShape.dragStartX ?? 0);
+      const yDiff = event.clientY - (movingShape.dragStartY ?? 0);
+      movingShape.x += xDiff;
+      movingShape.y += yDiff;
+
+      movingShape.dragStartX = event.clientX;
+      movingShape.dragStartY = event.clientY;
+
       setMovingShape(movingShape);
     }
   };
@@ -136,7 +167,7 @@ const App = () => {
     }
 
     renderCanvas(canvas, context);
-    setInterval(() => renderCanvas(canvas, context), 100);
+    setInterval(() => renderCanvas(canvas, context), 10);
   }, []);
 
   return (
