@@ -105,7 +105,7 @@ const App = () => {
       }
     }
 
-    // Want to have O(1) and process rendering exclusions once
+    // Let's have a map to process rendering exclusions once and have O(1) for checks
     const processingShapesMap = movingShapes.length
       ? toMap(
           movingShapes,
@@ -324,12 +324,13 @@ const App = () => {
 
     // Finalizing drag'n'drop by updating coordinates of a shape that's being moved
     if (movingShapes.length) {
-      const allShapes = getShapes();
+      // Let's have a map to process rendering exclusions once and have O(1) for updates
       const movingShapesMap = toMap(
         movingShapes,
         (shape) => shape.id,
         (shape) => shape
       );
+      const allShapes = getShapes();
 
       for (const shape of allShapes) {
         const movingShape = movingShapesMap[shape.id] ?? {};
