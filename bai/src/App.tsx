@@ -59,9 +59,9 @@ const App = () => {
     };
 
     const renderMovingShape = (shape: Shape) => {
-      const { x, y, width, height, color } = shape;
+      const { x, y, width, height } = shape;
 
-      context.strokeStyle = color;
+      context.strokeStyle = 'grey';
       context.strokeRect(x, y, width, height);
     };
 
@@ -214,8 +214,9 @@ const App = () => {
         }
 
         setShapes(otherShapesToMove);
-        setMovingShapes(newMovingShapes);
       }
+
+      setMovingShapes(newMovingShapes);
     }
   };
 
@@ -331,7 +332,7 @@ const App = () => {
       );
 
       for (const shape of allShapes) {
-        const movingShape = movingShapesMap[shape.id];
+        const movingShape = movingShapesMap[shape.id] ?? {};
 
         if (shape.id === movingShape.id) {
           shape.x = movingShape.x;
