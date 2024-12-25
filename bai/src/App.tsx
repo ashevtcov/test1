@@ -1,9 +1,8 @@
-import React, { KeyboardEvent, MouseEvent, useEffect, useRef } from 'react';
+import React, { MouseEvent, useEffect, useRef } from 'react';
 import { useLocalStorageState } from './hooks/useLocalStorageState';
-import { newId } from './tools/object';
+import { newId, toMap } from './tools/object';
 import { Rect, Selection, SelectionGroup, Shape } from './types/shapes';
 import { generatePastelColor, normalizeSelection } from './tools/shapes';
-import { ToolbarMode } from './types/app';
 
 const Dimensions = {
   width: window.innerWidth - 200,
@@ -16,7 +15,7 @@ const App = () => {
   const [getSelection, setSelection] = useGlobalState<Selection | null>(null);
   const [getSelectionGroup, setSelectionGroup] =
     useGlobalState<SelectionGroup | null>(null);
-  const [getMovingShape, setMovingShape] = useGlobalState<Shape | null>(null);
+  const [getMovingShapes, setMovingShapes] = useGlobalState<Shape[]>([]);
   const [getResizingShape, setResizingShape] = useGlobalState<Shape | null>(
     null
   );
@@ -98,15 +97,30 @@ const App = () => {
     }
 
     // Single dragging shape
-    const movingShape = getMovingShape();
+    const movingShapes = getMovingShapes();
 
-    if (movingShape) {
-      renderMovingShape(movingShape);
+    if (movingShapes.length) {
+      for (const shape of movingShapes) {
+        renderMovingShape(shape);
+      }
+    }
+
+    // Want to have O(1) and process rendering exclusions once
+    const processingShapesMap = movingShapes.length
+      ? toMap(
+          movingShapes,
+          (shape) => shape.id,
+          (_) => true
+        )
+      : {};
+
+    if (resizingShape) {
+      processingShapesMap[resizingShape.id] = true;
     }
 
     // All shapes, that neither resizing nor dragging
     for (const shape of getShapes()) {
-      if (shape.id !== movingShape?.id && shape.id !== resizingShape?.id) {
+      if (!processingShapesMap[shape.id]) {
         renderShape(shape);
       }
     }
@@ -172,16 +186,16 @@ const App = () => {
 
     // A shape is being moved as mouse pointer is within its bounds but not the resize box
     if (draggingShape) {
+      const newMovingShapes = [draggingShape];
       draggingShape.dragStart = {
         x: event.clientX,
         y: event.clientY,
       };
-      setMovingShape(draggingShape);
 
-      // TODO: Fix this
+      // Moving shapes in selection group
       const selectionGroup = getSelectionGroup();
       const otherShapesToMove = selectionGroup
-        ? Object.values(selectionGroup.shapes)
+        ? Object.values(selectionGroup?.shapes ?? {})
         : [];
 
       if (otherShapesToMove.length > 1) {
@@ -195,11 +209,13 @@ const App = () => {
             x: event.clientX,
             y: event.clientY,
           };
+
+          newMovingShapes.push(shape);
         }
 
         setShapes(otherShapesToMove);
+        setMovingShapes(newMovingShapes);
       }
-      /////////
     }
   };
 
@@ -237,54 +253,26 @@ const App = () => {
       return;
     }
 
-    const movingShape = getMovingShape();
+    const movingShapes = getMovingShapes();
+    const newMovingShapes = [];
 
     // Updating bounds of a shape that's being moved
-    if (movingShape?.dragStart) {
-      const xDiff = event.clientX - (movingShape.dragStart.x ?? 0);
-      const yDiff = event.clientY - (movingShape.dragStart.y ?? 0);
+    for (const shape of movingShapes) {
+      if (shape?.dragStart) {
+        const xDiff = event.clientX - (shape.dragStart.x ?? 0);
+        const yDiff = event.clientY - (shape.dragStart.y ?? 0);
 
-      movingShape.x += xDiff;
-      movingShape.y += yDiff;
-      movingShape.dragStart.x = event.clientX;
-      movingShape.dragStart.y = event.clientY;
+        shape.x += xDiff;
+        shape.y += yDiff;
+        shape.dragStart.x = event.clientX;
+        shape.dragStart.y = event.clientY;
 
-      // TODO: Fix this
-      const selectionGroup = getSelectionGroup();
-      const otherShapesToMove = selectionGroup
-        ? Object.values(selectionGroup.shapes)
-        : [];
-
-      if (otherShapesToMove.length > 1) {
-        for (const shape of otherShapesToMove) {
-          if (shape.id === movingShape.id) {
-            // Already moved
-            continue;
-          }
-
-          shape.x += xDiff;
-          shape.y += yDiff;
-
-          // const dragStart = {
-          //   x: shape.dragStart?.x ?? 0,
-          //   y: shape.dragStart?.y ?? 0,
-          // };
-          // const xDiffAnother = event.clientX - dragStart.x;
-          // const yDiffAnother = event.clientY - dragStart.y;
-          // shape.x += xDiffAnother;
-          // shape.y += yDiffAnother;
-          // shape.dragStart = {
-          //   x: event.clientX,
-          //   y: event.clientY,
-          // };
-        }
+        newMovingShapes.push(shape);
       }
+    }
 
-      // setShapes(otherShapesToMove);
-
-      ///////////
-
-      setMovingShape(movingShape);
+    if (newMovingShapes.length) {
+      setMovingShapes(newMovingShapes);
     }
   };
 
@@ -331,13 +319,20 @@ const App = () => {
       return;
     }
 
-    const movingShape = getMovingShape();
+    const movingShapes = getMovingShapes();
 
     // Finalizing drag'n'drop by updating coordinates of a shape that's being moved
-    if (movingShape) {
+    if (movingShapes.length) {
       const allShapes = getShapes();
+      const movingShapesMap = toMap(
+        movingShapes,
+        (shape) => shape.id,
+        (shape) => shape
+      );
 
       for (const shape of allShapes) {
+        const movingShape = movingShapesMap[shape.id];
+
         if (shape.id === movingShape.id) {
           shape.x = movingShape.x;
           shape.y = movingShape.y;
@@ -345,7 +340,7 @@ const App = () => {
       }
 
       setShapes(allShapes);
-      setMovingShape(null);
+      setMovingShapes([]);
     }
 
     // Bonus - if we want to select a shape (let's say for deleting) by clicking on it
