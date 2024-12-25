@@ -1,8 +1,14 @@
-import React, { MouseEvent, useEffect, useRef } from 'react';
+import React, { KeyboardEvent, MouseEvent, useEffect, useRef } from 'react';
 import { useLocalStorageState } from './hooks/useLocalStorageState';
 import { newId } from './tools/object';
 import { Rect, Selection, SelectionGroup, Shape } from './types/shapes';
-import { normalizeSelection } from './tools/shapes';
+import { generatePastelColor, normalizeSelection } from './tools/shapes';
+import { ToolbarMode } from './types/app';
+
+const Dimensions = {
+  width: window.innerWidth - 200,
+  height: window.innerHeight,
+};
 
 const App = () => {
   const useGlobalState = useLocalStorageState();
@@ -17,19 +23,19 @@ const App = () => {
   const [getShapes, setShapes] = useGlobalState<Shape[]>([
     {
       id: newId(),
-      x: 20,
-      y: 20,
+      x: 100,
+      y: 100,
       width: 100,
       height: 50,
-      color: 'green',
+      color: generatePastelColor(),
     },
     {
       id: newId(),
-      x: 150,
-      y: 100,
+      x: 250,
+      y: 200,
       width: 120,
       height: 30,
-      color: 'red',
+      color: generatePastelColor(),
     },
   ]);
 
@@ -46,11 +52,11 @@ const App = () => {
       context.fillStyle = 'black';
       context.fillRect(x + width - 10, y + height - 10, 10, 10);
 
-      if (selectionGroup?.shapes[id]) {
-        context.lineWidth = 2;
-        context.strokeStyle = 'black';
-        context.strokeRect(x, y, width, height);
-      }
+      const isSelected = selectionGroup?.shapes[id];
+
+      context.lineWidth = isSelected ? 3 : 1;
+      context.strokeStyle = isSelected ? 'black' : 'grey';
+      context.strokeRect(x, y, width, height);
     };
 
     const renderMovingShape = (shape: Shape) => {
@@ -75,7 +81,7 @@ const App = () => {
       context.strokeRect(x, y, width, height);
     };
 
-    context.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    context.clearRect(0, 0, Dimensions.width, Dimensions.height);
 
     // Selection
     const selection = getSelection();
@@ -256,22 +262,26 @@ const App = () => {
             continue;
           }
 
-          const dragStart = {
-            x: shape.dragStart?.x ?? 0,
-            y: shape.dragStart?.y ?? 0,
-          };
-          const xDiffAnother = event.clientX - dragStart.x;
-          const yDiffAnother = event.clientY - dragStart.y;
-          shape.x += xDiffAnother;
-          shape.y += yDiffAnother;
-          shape.dragStart = {
-            x: event.clientX,
-            y: event.clientY,
-          };
-        }
+          shape.x += xDiff;
+          shape.y += yDiff;
 
-        setShapes(otherShapesToMove);
+          // const dragStart = {
+          //   x: shape.dragStart?.x ?? 0,
+          //   y: shape.dragStart?.y ?? 0,
+          // };
+          // const xDiffAnother = event.clientX - dragStart.x;
+          // const yDiffAnother = event.clientY - dragStart.y;
+          // shape.x += xDiffAnother;
+          // shape.y += yDiffAnother;
+          // shape.dragStart = {
+          //   x: event.clientX,
+          //   y: event.clientY,
+          // };
+        }
       }
+
+      // setShapes(otherShapesToMove);
+
       ///////////
 
       setMovingShape(movingShape);
@@ -357,14 +367,44 @@ const App = () => {
     }
   };
 
+  const onDeleteShape = () => {
+    const selectionGroup = getSelectionGroup();
+    const newShapes = getShapes().filter(
+      ({ id }) => !selectionGroup?.shapes[id]
+    );
+
+    setSelectionGroup(null);
+    setShapes(newShapes);
+  };
+
+  const onCreateShape = () => {
+    const newShape: Shape = {
+      id: newId(),
+      x: 10,
+      y: 10,
+      width: 100,
+      height: 100,
+      color: generatePastelColor(),
+    };
+    const newShapes = [...getShapes(), newShape];
+
+    setShapes(newShapes);
+    setSelectionGroup(null);
+  };
+
+  const onClearSelection = () => {
+    setSelectionGroup(null);
+  };
+
   useEffect(() => {
     if (!canvasRef.current) {
       return;
     }
 
     const canvas = canvasRef.current;
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    canvas.width = Dimensions.width;
+    canvas.height = Dimensions.height;
+    canvas.tabIndex = 1000;
 
     const context = canvas.getContext('2d');
 
@@ -374,21 +414,44 @@ const App = () => {
 
     renderCanvas(canvas, context);
     setInterval(() => renderCanvas(canvas, context), 10);
+
+    canvasRef.current.focus();
   }, []);
 
   return (
-    <div className="App">
+    <div
+      className="App"
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'row',
+      }}
+    >
       <canvas
         ref={canvasRef}
         onMouseDown={onMouseDown}
         onMouseUp={onMouseUp}
         onMouseMove={onMouseMove}
         style={{
-          width: window.innerWidth,
-          height: window.innerHeight,
+          width: Dimensions.width,
+          height: Dimensions.height,
           border: '2px solid grey',
         }}
       ></canvas>
+
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          gap: '10px',
+          flexDirection: 'column',
+          padding: 10,
+        }}
+      >
+        <button onClick={onCreateShape}>Create Shape</button>
+        <button onClick={onDeleteShape}>Delete Shape</button>
+        <button onClick={onClearSelection}>Clear Selection</button>
+      </div>
     </div>
   );
 };
