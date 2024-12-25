@@ -1,7 +1,8 @@
 # Test Task
 
 The test project was implemented using TypeScript, React and HTML Canvas.
-State management architecture is skipped, however for production I would prefer Redux.
+State management architecture is simplified, however for production I would prefer Redux.
+Multiselection is implemented via boundary selection. Multi drag is implemented.
 
 ## Available Scripts
 
